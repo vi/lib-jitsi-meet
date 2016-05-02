@@ -154,19 +154,19 @@ JingleSessionPC.prototype.doInitialize = function () {
 					{
 						i = self.enqueuedAddedStreamEvents.shift();
 						logger.log("REMOTE STREAM ADDED: ", i.stream , i.stream.id);
-						self.remoteStreamAdded(i);
+						self.remoteStreamAdded(i.stream);
 					}
 					//dont process fake call
 					if(event.stream.id != null)
 					{
 						logger.log("REMOTE STREAM ADDED: ", event.stream , event.stream.id);
-						self.remoteStreamAdded(event);
+						self.remoteStreamAdded(event.stream);
 					}
 				}
 			}
 			else
 			{
-				self.remoteStreamAdded(event);
+				self.remoteStreamAdded(event.stream);
 			}
     };
     this.peerconnection.onremovestream = function (event) {
@@ -1249,6 +1249,7 @@ JingleSessionPC.onJingleFatalError = function (session, error)
  */
 JingleSessionPC.prototype.remoteStreamAdded = function (stream) {
     var self = this;
+	console.log("alpha -> : ", stream);
     if (!RTC.isUserStream(stream)) {
         logger.info(
             "Ignored remote 'stream added' event for non-user stream", stream);
@@ -1299,12 +1300,16 @@ JingleSessionPC.prototype.remoteTrackAdded = function (stream, track) {
         logger.error("MediaType undefined", track);
         return;
     }
-
+	
     var remoteSDP = new SDP(this.peerconnection.remoteDescription.sdp);
+	
+	console.log("remoteSDP",this.peerconnection.remoteDescription.sdp);
+	
     var medialines = remoteSDP.media.filter(function (mediaLines){
         return mediaLines.startsWith("m=" + mediaType);
     });
 
+	console.log("medialines",medialines);
     if (!medialines.length) {
         logger.error("No media for type " + mediaType + " found in remote SDP");
         return;

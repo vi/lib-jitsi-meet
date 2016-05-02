@@ -667,22 +667,15 @@ var RTCUtils = {
                     if (element)
                         element.setAttribute("src", src);
                 };
-                
+                self.getStreamID = function (stream) {
+						var id = stream.id;
+						return SDPUtil.filter_special_chars(id);
+					};
 				
                 self.pc_constraints = {};
                 
-                self.getStreamID = function (stream) {
-                    var id = stream.id;
-                    if (!id) {
-                        var tracks = stream.getVideoTracks();
-                        if (!tracks || tracks.length === 0) {
-                            tracks = stream.getAudioTracks();
-                        }
-                        id = tracks[0].id;
-                    }
-                    return SDPUtil.filter_special_chars(id);
-                };
-				 document.addEventListener("deviceready", function () {
+				document.addEventListener("deviceready", function () {
+					
 					 
 					  //getStats not yet implemented in iosrtc plugin
 					 cordova.plugins.iosrtc.RTCPeerConnection.prototype.getStats = function(callback)
