@@ -55,6 +55,23 @@ function JingleSessionPC(me, sid, peerjid, connection,
     // We start with the queue paused. We resume it when the signaling state is
     // stable and the ice connection state is connected.
     this.modifySourcesQueue.pause();
+	
+	if(RTCBrowserType.isiOSRTC())
+	{
+		this.isRemoteDescriptionSetting = false;
+		this.enqueuedAddedStreamEvents = [];
+		this.sendRemoteDescriptionSetSuccess = function()
+		{
+			var event = {
+							stream: {
+										id:null
+									}
+						};
+			
+			//send fake wakeup event
+			this.peerconnection.onaddstream(event);
+		};
+	}
 }
 //XXX this is badly broken...
 JingleSessionPC.prototype = JingleSession.prototype;
@@ -114,7 +131,43 @@ JingleSessionPC.prototype.doInitialize = function () {
         self.sendIceCandidate(candidate);
     };
     this.peerconnection.onaddstream = function (event) {
-        self.remoteStreamAdded(event.stream);
+        //cordova responds asynchronously for peerconnection.setRemoteDescription
+			// in case where it's not set, we store calls to remoteStreamAdded 
+			console.log("this.peerconnection.onaddstream", event);
+			if(RTCBrowserType.isiOSRTC())
+			{
+				if(self.isRemoteDescriptionSetting == true)
+				{
+					//dont process fake call
+					if(event.stream.id != null)
+					{
+						console.log("enqueued", event);
+						self.enqueuedAddedStreamEvents.push(event);
+					}
+				}
+				else
+				{
+					//if remoteDescription is ready
+					//handle existing events before current event
+					var i = null;
+					while(self.enqueuedAddedStreamEvents.length > 0)
+					{
+						i = self.enqueuedAddedStreamEvents.shift();
+						logger.log("REMOTE STREAM ADDED: ", i.stream , i.stream.id);
+						self.remoteStreamAdded(i);
+					}
+					//dont process fake call
+					if(event.stream.id != null)
+					{
+						logger.log("REMOTE STREAM ADDED: ", event.stream , event.stream.id);
+						self.remoteStreamAdded(event);
+					}
+				}
+			}
+			else
+			{
+				self.remoteStreamAdded(event);
+			}
     };
     this.peerconnection.onremovestream = function (event) {
         self.remoteStreamRemoved(event.stream);
@@ -330,6 +383,14 @@ JingleSessionPC.prototype.setOfferCycle = function (jingleOfferIq,
  *        setRemoteDescription fails.
  */
 JingleSessionPC.prototype.setOffer = function (jingleOfferIq, success, failure) {
+	 var self = this;
+		//as cordov-plugin-iosrtc does external calls, events are called asynchronously 
+	// by javascript and may be executed before the native callback of cordov-plugin-iosrtc
+	if(RTCBrowserType.isiOSRTC())
+	{
+		self.isRemoteDescriptionSetting = true;
+	}
+	
     this.remoteSDP = new SDP('');
     if (this.webrtcIceTcpDisable) {
         this.remoteSDP.removeTcpCandidates = true;
@@ -337,7 +398,7 @@ JingleSessionPC.prototype.setOffer = function (jingleOfferIq, success, failure) 
     if (this.webrtcIceUdpDisable) {
         this.remoteSDP.removeUdpCandidates = true;
     }
-
+	
     this.remoteSDP.fromJingle(jingleOfferIq);
     this.readSsrcInfo($(jingleOfferIq).find(">content"));
     var remotedesc
@@ -347,6 +408,11 @@ JingleSessionPC.prototype.setOffer = function (jingleOfferIq, success, failure) 
         function () {
             //logger.log('setRemoteDescription success');
             if (success) {
+				if(RTCBrowserType.isiOSRTC())
+				{
+					self.isRemoteDescriptionSetting = false;
+					self.sendRemoteDescriptionSetSuccess();
+				}
                 success();
             }
         },
@@ -812,7 +878,14 @@ JingleSessionPC.prototype.removeSource = function (elem) {
 
 JingleSessionPC.prototype._modifySources = function (successCallback, queueCallback) {
     var self = this;
-
+	
+	//as cordov-plugin-iosrtc does external calls, events are called asynchronously 
+	// by javascript and may be executed before the native callback of cordov-plugin-iosrtc
+	if(RTCBrowserType.isiOSRTC())
+	{
+		self.isRemoteDescriptionSetting = true;
+	}
+	
     if (this.peerconnection.signalingState == 'closed') return;
     if (!(this.addssrc.length || this.removessrc.length || this.pendingop !== null
         || this.modifyingLocalStreams)){
@@ -849,13 +922,17 @@ JingleSessionPC.prototype._modifySources = function (successCallback, queueCallb
     sdp.raw = sdp.session + sdp.media.join('');
     this.peerconnection.setRemoteDescription(new RTCSessionDescription({type: 'offer', sdp: sdp.raw}),
         function() {
-
+			if(RTCBrowserType.isiOSRTC())
+			{
+				self.isRemoteDescriptionSetting = false;
+				self.sendRemoteDescriptionSetSuccess();
+			}
             if(self.signalingState == 'closed') {
                 logger.error("createAnswer attempt on closed state");
                 queueCallback("createAnswer attempt on closed state");
                 return;
             }
-
+			
             self.peerconnection.createAnswer(
                 function(modifiedAnswer) {
                     // change video direction, see https://github.com/jitsi/jitmeet/issues/41

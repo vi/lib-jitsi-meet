@@ -43,6 +43,9 @@ var RTCBrowserType = {
     isNWJS: function () {
         return currentBrowser === RTCBrowserType.RTC_BROWSER_NWJS;
     },
+    isiOSRTC: function () {
+        return currentBrowser === RTCBrowserType.RTC_BROWSER_IOSRTC;
+    },
     isTemasysPluginUsed: function () {
         return RTCBrowserType.isIExplorer() || RTCBrowserType.isSafari();
     },
@@ -160,7 +163,48 @@ function detectNWJS (){
     }
     return null;
 }
-
+function detectiOSRTC(){
+	var userAgent = navigator.userAgent;
+	if (userAgent.match(/iOSRTC/))
+	{
+		
+		currentBrowser = RTCBrowserType.RTC_BROWSER_IOSRTC;
+        var version = userAgent.match(/iOSRTC\/([\d.]+)/)[1];
+		console.info("This appears to be Cordova iOSRTC app, ver: " + version);
+		
+		//console.info("Checking cordova environment");
+		/*if(cordova && cordova.plugins)
+		{
+			console.info("Checking plugin iosrtc");
+			if(cordova.plugins.iosrtc)
+			{
+				console.info("Checking globals registration");
+				if(navigator.getUserMedia)
+				{
+					console.info(
+					"SUCCESS: Cordova iosrtc environment detected");*/
+					return version;
+				/*}
+				else
+				{
+					console.error("Globals aren't registered");
+					return null;
+				}
+			}
+			else
+			{
+				console.warn("Cordova plugin iosrtc not found");
+				return null;
+			}
+		}
+		else
+		{
+			console.warn("Cordova not found");
+			return null;
+		}*/
+	}
+	return null;
+}
 function detectBrowser() {
     var version;
     var detectors = [
@@ -169,7 +213,8 @@ function detectBrowser() {
         detectChrome,
         detectFirefox,
         detectIE,
-        detectSafari
+        detectSafari,
+		detectiOSRTC
     ];
     // Try all browser detectors
     for (var i = 0; i < detectors.length; i++) {

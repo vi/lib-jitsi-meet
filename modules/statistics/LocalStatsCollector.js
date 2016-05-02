@@ -88,7 +88,7 @@ function LocalStatsCollector(stream, interval, callback) {
  */
 LocalStatsCollector.prototype.start = function () {
     if (!context ||
-        RTCBrowserType.isTemasysPluginUsed())
+        RTCBrowserType.isTemasysPluginUsed() || RTCBrowserType.isiOSRTC())
         return;
 
     var analyser = context.createAnalyser();

@@ -379,7 +379,7 @@ function handleLocalStream(streams, resolution) {
     var audioStream, videoStream, desktopStream, res = [];
     // If this is FF, the stream parameter is *not* a MediaStream object, it's
     // an object with two properties: audioStream, videoStream.
-    if (window.webkitMediaStream) {
+    if (window.webkitMediaStream && !RTCBrowserType.isiOSRTC()) {
         var audioVideo = streams.audioVideo;
         if (audioVideo) {
             var audioTracks = audioVideo.getAudioTracks();
@@ -413,6 +413,21 @@ function handleLocalStream(streams, resolution) {
         if(streams && streams.desktop)
             desktopStream = streams.desktop;
     }
+	
+	else if(RTCBrowserType.isiOSRTC())
+	{
+		 if (streams && streams.audio)
+		{
+            audioStream = streams.audio;
+		}
+
+        if (streams && streams.video){
+            videoStream = streams.video;
+		}
+
+        if(streams && streams.desktop)
+            desktopStream = streams.desktop;
+	}
 
     if (desktopStream)
         res.push({
@@ -622,7 +637,95 @@ var RTCUtils = {
                     onReady(options, self.getUserMediaWithConstraints);
                     resolve();
                 });
-            } else {
+            }
+			else if(RTCBrowserType.isiOSRTC())
+			{
+					
+				 var self = this;
+				 self.attachMediaStream = function (element, stream) {
+                    // saves the created url for the stream, so we can reuse it
+                    // and not keep creating urls
+                    if (!element)
+                        return;
+					
+					//parent.cordova.plugins.iosrtc.observeVideo(element);
+					// Attach the MediaStream to it.
+					element.src = URL.createObjectURL(stream);
+                    
+                    return element;
+                };
+              
+				self.getVideoSrc = function (element) {
+                    if (!element)
+                        return null;
+                    return element.getAttribute("src");
+                };
+                self.setVideoSrc = function (element, src) {
+                    if (!src) {
+                        src = '';
+                    }
+                    if (element)
+                        element.setAttribute("src", src);
+                };
+                
+				
+                self.pc_constraints = {};
+                
+                self.getStreamID = function (stream) {
+                    var id = stream.id;
+                    if (!id) {
+                        var tracks = stream.getVideoTracks();
+                        if (!tracks || tracks.length === 0) {
+                            tracks = stream.getAudioTracks();
+                        }
+                        id = tracks[0].id;
+                    }
+                    return SDPUtil.filter_special_chars(id);
+                };
+				 document.addEventListener("deviceready", function () {
+					 
+					  //getStats not yet implemented in iosrtc plugin
+					 cordova.plugins.iosrtc.RTCPeerConnection.prototype.getStats = function(callback)
+					 {
+						 //console.log("simulated callback for peerconnection.getStats() remove this when its done RTCUtils line ~630");
+					 };/**/
+					 self.peerconnection = cordova.plugins.iosrtc.RTCPeerConnection;
+				 
+					
+					 navigator.mediaDevices = new Object();
+					 navigator.mediaDevices.getUserMedia     = cordova.plugins.iosrtc.getUserMedia;
+					 navigator.mediaDevices.enumerateDevices = cordova.plugins.iosrtc.enumerateDevices;
+					 self.getUserMedia = cordova.plugins.iosrtc.getUserMedia;
+					 self.mediaDevices = navigator.mediaDevices;
+					 navigator.mediaDevices = self.mediaDevices;
+					 
+					 self.enumerateDevices = 
+					 wrapEnumerateDevices(cordova.plugins.iosrtc.enumerateDevices);
+					 RTCIceCandidate = cordova.plugins.iosrtc.RTCIceCandidate;
+					 window.RTCSessionDescription            = cordova.plugins.iosrtc.RTCSessionDescription;
+					
+					window.MediaStream                      = cordova.plugins.iosrtc.MediaStream;
+					window.MediaStreamTrack                 = cordova.plugins.iosrtc.MediaStreamTrack
+					 
+					console.log("iOSRTCApp >>> deviceready event");
+					console.log("Navigator UA : "+ navigator.userAgent);
+					console.log("Domain : "+ document.domain);
+											
+					// enabler debub
+					cordova.plugins.iosrtc.debug.enable("*");
+
+					/* // Pollute global namespace with WebRTC stuff.
+					*/
+				
+					//to avoid chrome detection which uses this variable 
+					//navigator.webkitGetUserMedia = undefined;
+					//injectJitsiMeet();
+					onReady(options, this.getUserMediaWithConstraints);
+					resolve();
+				 });  // End of ondeviceready.
+                
+			}				
+			else {
                 try {
                     logger.error('Browser does not appear to be WebRTC-capable');
                 } catch (e) {
@@ -632,7 +735,7 @@ var RTCUtils = {
             }
 
             // Call onReady() if Temasys plugin is not used
-            if (!RTCBrowserType.isTemasysPluginUsed()) {
+            if (!RTCBrowserType.isTemasysPluginUsed() && !RTCBrowserType.isiOSRTC()) {
                 onReady(options, this.getUserMediaWithConstraints);
                 resolve();
             }
@@ -707,7 +810,7 @@ var RTCUtils = {
                 reject(new Error("Desktop sharing is not supported!"));
             }
             if (RTCBrowserType.isFirefox() ||
-                RTCBrowserType.isTemasysPluginUsed()) {
+                RTCBrowserType.isTemasysPluginUsed() || RTCBrowserType.isiOSRTC()) {
                 var GUM = function (device, s, e) {
                     this.getUserMediaWithConstraints(device, s, e, options);
                 };
@@ -823,6 +926,7 @@ var RTCUtils = {
         return RTCBrowserType.isChrome() ||
             RTCBrowserType.isFirefox() ||
             RTCBrowserType.isOpera() ||
+			RTCBrowserType.isiOSRTC() ||
             RTCBrowserType.isTemasysPluginUsed();
     },
     /**

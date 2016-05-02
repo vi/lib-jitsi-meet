@@ -21,6 +21,8 @@ function TraceablePeerConnection(ice_config, constraints, session) {
         RTCPeerConnectionType = mozRTCPeerConnection;
     } else if (RTCBrowserType.isTemasysPluginUsed()) {
         RTCPeerConnectionType = RTCPeerConnection;
+    } else if (RTCBrowserType.isiOSRTC()) {
+        RTCPeerConnectionType = cordova.plugins.iosrtc.RTCPeerConnection;
     } else {
         RTCPeerConnectionType = webkitRTCPeerConnection;
     }

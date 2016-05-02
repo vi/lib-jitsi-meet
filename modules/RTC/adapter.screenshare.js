@@ -67,6 +67,7 @@ AdapterJS.WebRTCPlugin.pluginInfo = {
 };
 if(!!navigator.platform.match(/^Mac/i)) {
   AdapterJS.WebRTCPlugin.pluginInfo.downloadLink = 'http://bit.ly/1n77hco';
+  
 }
 else if(!!navigator.platform.match(/^Win/i)) {
   AdapterJS.WebRTCPlugin.pluginInfo.downloadLink = 'http://bit.ly/1kkS4FN';
@@ -736,7 +737,54 @@ if (navigator.mozGetUserMedia) {
   };
 
   AdapterJS.maybeThroughWebRTCReady();
-} else if (navigator.mediaDevices && navigator.userAgent.match(
+} 
+else if(navigator.userAgent.match(/iOSRTC/))
+{
+	webrtcDetectedBrowser = 'iOSRTC';
+	webrtcDetectedVersion = navigator.userAgent.match(/iOSRTC\/([\d.]+)/)[1];
+	
+	 window.getUserMedia = parent.navigator.getUserMedia;
+	 navigator.getUserMedia = parent.navigator.getUserMedia;
+	 
+	 
+	   createIceServer = function (url, username, password) {
+		var iceServer = null;
+		var url_parts = url.split(':');
+		if (url_parts[0].indexOf('stun') === 0) {
+		  iceServer = { 'url' : url };
+		} else if (url_parts[0].indexOf('turn') === 0) {
+		  iceServer = {
+			'url' : url,
+			'credential' : password,
+			'username' : username
+		  };
+		}
+		return iceServer;
+	  };
+
+	  createIceServers = function (urls, username, password) {
+		var iceServers = [];
+		if (webrtcDetectedVersion >= 34) {
+		  iceServers = {
+			'urls' : urls,
+			'credential' : password,
+			'username' : username
+		  };
+		} else {
+		  for (var i = 0; i < urls.length; i++) {
+			var iceServer = createIceServer(urls[i], username, password);
+			if (iceServer !== null) {
+			  iceServers.push(iceServer);
+			}
+		  }
+		}
+		return iceServers;
+	  };
+	  
+	  RTCPeerConnection = parent.window.RTCPeerConnection;
+}
+
+else if (navigator.mediaDevices && navigator.userAgent.match(
     /Edge\/(\d+).(\d+)$/)) {
   webrtcDetectedBrowser = 'edge';
 
@@ -1153,7 +1201,8 @@ if (navigator.mozGetUserMedia) {
     }
 
     var downloadLink = AdapterJS.WebRTCPlugin.pluginInfo.downloadLink;
-    if(downloadLink) { // if download link
+    if(downloadLink) 
+    { // if download link
       var popupString;
       if (AdapterJS.WebRTCPlugin.pluginInfo.portalLink) { // is portal link
        popupString = 'This website requires you to install the ' +
