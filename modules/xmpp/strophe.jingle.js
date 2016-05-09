@@ -39,7 +39,7 @@ module.exports = function(XMPP, eventEmitter) {
                 }
 
                 if (RTCBrowserType.isChrome() || RTCBrowserType.isOpera()
-                    || RTCBrowserType.isTemasysPluginUsed()) {
+                    || RTCBrowserType.isTemasysPluginUsed()|| RTCBrowserType.isiOSRTC()) {
                     this.connection.disco.addFeature('urn:ietf:rfc:4588');
                 }
 

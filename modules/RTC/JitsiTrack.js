@@ -176,7 +176,7 @@ JitsiTrack.prototype.attach = function (container) {
         // The container must be visible in order to play or attach the stream
         // when Temasys plugin is in use
         var containerSel = $(container);
-        if (RTCBrowserType.isTemasysPluginUsed() &&
+        if ((RTCBrowserType.isTemasysPluginUsed() || RTCBrowserType.isiOSRTC()) &&
             !containerSel.is(':visible')) {
             containerSel.show();
         }

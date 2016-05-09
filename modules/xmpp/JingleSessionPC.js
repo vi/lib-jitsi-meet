@@ -1249,7 +1249,6 @@ JingleSessionPC.onJingleFatalError = function (session, error)
  */
 JingleSessionPC.prototype.remoteStreamAdded = function (stream) {
     var self = this;
-	console.log("alpha -> : ", stream);
     if (!RTC.isUserStream(stream)) {
         logger.info(
             "Ignored remote 'stream added' event for non-user stream", stream);
@@ -1302,14 +1301,10 @@ JingleSessionPC.prototype.remoteTrackAdded = function (stream, track) {
     }
 	
     var remoteSDP = new SDP(this.peerconnection.remoteDescription.sdp);
-	
-	console.log("remoteSDP",this.peerconnection.remoteDescription.sdp);
-	
+		
     var medialines = remoteSDP.media.filter(function (mediaLines){
         return mediaLines.startsWith("m=" + mediaType);
     });
-
-	console.log("medialines",medialines);
     if (!medialines.length) {
         logger.error("No media for type " + mediaType + " found in remote SDP");
         return;

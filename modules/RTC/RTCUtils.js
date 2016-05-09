@@ -673,50 +673,37 @@ var RTCUtils = {
 					};
 				
                 self.pc_constraints = {};
-                
-				document.addEventListener("deviceready", function () {
-					
+                window.addEventListener("load", function () {
+					console.log("lib-jitsi-cordova >>> DOM ready event");
+					document.addEventListener("deviceready", function () {
+						console.log("lib-jitsi-cordova >>> deviceready event");
+						  //getStats not yet implemented in iosrtc plugin
+						 cordova.plugins.iosrtc.RTCPeerConnection.prototype.getStats = function(callback)
+						 {
+							 //console.log("simulated callback for peerconnection.getStats() remove this when its done RTCUtils line ~630");
+						 };
+						 self.peerconnection = cordova.plugins.iosrtc.RTCPeerConnection;
 					 
-					  //getStats not yet implemented in iosrtc plugin
-					 cordova.plugins.iosrtc.RTCPeerConnection.prototype.getStats = function(callback)
-					 {
-						 //console.log("simulated callback for peerconnection.getStats() remove this when its done RTCUtils line ~630");
-					 };/**/
-					 self.peerconnection = cordova.plugins.iosrtc.RTCPeerConnection;
-				 
-					
-					 navigator.mediaDevices = new Object();
-					 navigator.mediaDevices.getUserMedia     = cordova.plugins.iosrtc.getUserMedia;
-					 navigator.mediaDevices.enumerateDevices = cordova.plugins.iosrtc.enumerateDevices;
-					 self.getUserMedia = cordova.plugins.iosrtc.getUserMedia;
-					 self.mediaDevices = navigator.mediaDevices;
-					 navigator.mediaDevices = self.mediaDevices;
-					 
-					 self.enumerateDevices = 
-					 wrapEnumerateDevices(cordova.plugins.iosrtc.enumerateDevices);
-					 RTCIceCandidate = cordova.plugins.iosrtc.RTCIceCandidate;
-					 window.RTCSessionDescription            = cordova.plugins.iosrtc.RTCSessionDescription;
-					
-					window.MediaStream                      = cordova.plugins.iosrtc.MediaStream;
-					window.MediaStreamTrack                 = cordova.plugins.iosrtc.MediaStreamTrack
-					 
-					console.log("iOSRTCApp >>> deviceready event");
-					console.log("Navigator UA : "+ navigator.userAgent);
-					console.log("Domain : "+ document.domain);
-											
-					// enabler debub
-					cordova.plugins.iosrtc.debug.enable("*");
-
-					/* // Pollute global namespace with WebRTC stuff.
-					*/
-				
-					//to avoid chrome detection which uses this variable 
-					//navigator.webkitGetUserMedia = undefined;
-					//injectJitsiMeet();
-					onReady(options, this.getUserMediaWithConstraints);
-					resolve();
-				 });  // End of ondeviceready.
-                
+						
+						 navigator.mediaDevices = new Object();
+						 navigator.mediaDevices.getUserMedia     = cordova.plugins.iosrtc.getUserMedia;
+						 navigator.mediaDevices.enumerateDevices = cordova.plugins.iosrtc.enumerateDevices;
+						 self.getUserMedia = cordova.plugins.iosrtc.getUserMedia;
+						 self.mediaDevices = navigator.mediaDevices;
+						 navigator.mediaDevices = self.mediaDevices;
+						 
+						 self.enumerateDevices = 
+						 wrapEnumerateDevices(cordova.plugins.iosrtc.enumerateDevices);
+						 RTCIceCandidate = cordova.plugins.iosrtc.RTCIceCandidate;
+						 window.RTCSessionDescription            = cordova.plugins.iosrtc.RTCSessionDescription;
+						
+						window.MediaStream                      = cordova.plugins.iosrtc.MediaStream;
+						window.MediaStreamTrack                 = cordova.plugins.iosrtc.MediaStreamTrack
+						 
+						onReady(options, this.getUserMediaWithConstraints);
+						resolve();
+					 });  // End of ondeviceready.
+				}); 
 			}				
 			else {
                 try {
