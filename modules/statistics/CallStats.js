@@ -15,6 +15,7 @@ var wrtcFuncNames = {
     setRemoteDescription: "setRemoteDescription",
     addIceCandidate:      "addIceCandidate",
     getUserMedia:         "getUserMedia",
+    iceConnectionFailure: "iceConnectionFailure",
     signalingError:       "signalingError"
 };
 
@@ -23,7 +24,6 @@ var wrtcFuncNames = {
  * @see http://www.callstats.io/api/#enumeration-of-fabricevent
  */
 var fabricEvent = {
-    fabricSetupFailed:"fabricSetupFailed",
     fabricHold:"fabricHold",
     fabricResume:"fabricResume",
     audioMute:"audioMute",
@@ -106,9 +106,9 @@ var CallStats = _try_catch(function(jingleSession, Settings, options) {
 
         this.userID = Settings.getCallStatsUserName();
 
-    //FIXME:  change it to something else (maybe roomName)
         var location = window.location;
-        this.confID = location.hostname + location.pathname;
+        // The confID is case sensitive!!!
+        this.confID = location.hostname + "/" + options.roomName;
 
         //userID is generated or given by the origin server
         callStats.initialize(options.callStatsID,
@@ -263,14 +263,13 @@ CallStats.prototype.sendTerminateEvent = _try_catch(function () {
 });
 
 /**
- * Notifies CallStats for connection setup errors
+ * Notifies CallStats for ice connection failed
+ * @param {RTCPeerConnection} pc connection on which failure occured.
+ * @param {CallStats} cs callstats instance related to the error (optional)
  */
-CallStats.prototype.sendSetupFailedEvent = _try_catch(function () {
-    if(!callStats) {
-        return;
-    }
-    callStats.sendFabricEvent(this.peerconnection,
-        callStats.fabricEvent.fabricSetupFailed, this.confID);
+CallStats.prototype.sendIceConnectionFailedEvent = _try_catch(function (pc, cs){
+    CallStats._reportError.call(
+        cs, wrtcFuncNames.iceConnectionFailure, null, pc);
 });
 
 /**
@@ -387,7 +386,10 @@ CallStats.sendAddIceCandidateFailed = _try_catch(function (e, pc, cs) {
  * @param {CallStats} cs callstats instance related to the error (optional)
  */
 CallStats.sendUnhandledError = _try_catch(function (e, cs) {
-    CallStats._reportError.call(cs, wrtcFuncNames.signalingError, e, null);
+    // for now send the stack property of errors, which is has the form:
+    // name: message <newline> stack(multiline)
+    CallStats._reportError
+        .call(cs, wrtcFuncNames.signalingError, e, null);
 });
 
 module.exports = CallStats;

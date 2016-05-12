@@ -311,7 +311,7 @@ function isUpdateRequired(minVersion, extVersion) {
 }
 
 function checkChromeExtInstalled(callback, options) {
-    if (!chrome || !chrome.runtime) {
+    if (typeof chrome === "undefined" || !chrome || !chrome.runtime) {
         // No API, so no extension for sure
         callback(false, false);
         return;

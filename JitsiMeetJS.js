@@ -37,7 +37,6 @@ var LibJitsiMeet = {
 
     version: '{#COMMIT_HASH#}',
 
-    JitsiConnection: JitsiConnection,
     events: {
         conference: JitsiConferenceEvents,
         connection: JitsiConnectionEvents,
@@ -61,12 +60,23 @@ var LibJitsiMeet = {
             var oldOnErrorHandler = window.onerror;
             window.onerror = function (message, source, lineno, colno, error) {
 
-                JitsiMeetJS.getGlobalOnErrorHandler(
+                this.getGlobalOnErrorHandler(
                     message, source, lineno, colno, error);
 
-                if(oldOnErrorHandler)
+                if (oldOnErrorHandler)
                     oldOnErrorHandler(message, source, lineno, colno, error);
-            }
+            }.bind(this);
+
+            // if an old handler exists also fire its events
+            var oldOnUnhandledRejection = window.onunhandledrejection;
+            window.onunhandledrejection = function(event) {
+
+                this.getGlobalOnErrorHandler(
+                    null, null, null, null, event.reason);
+
+                if(oldOnUnhandledRejection)
+                    oldOnUnhandledRejection(event);
+            }.bind(this);
         }
 
         return RTC.init(options || {});
@@ -141,12 +151,32 @@ var LibJitsiMeet = {
         return RTC.isDeviceListAvailable();
     },
     /**
-     * Returns true if changing the camera / microphone device is supported and
-     * false if not.
+     * Returns true if changing the input (camera / microphone) or output
+     * (audio) device is supported and false if not.
+     * @params {string} [deviceType] - type of device to change. Default is
+     *      undefined or 'input', 'output' - for audio output device change.
      * @returns {boolean} true if available, false otherwise.
      */
-    isDeviceChangeAvailable: function () {
-        return RTC.isDeviceChangeAvailable();
+    isDeviceChangeAvailable: function (deviceType) {
+        return RTC.isDeviceChangeAvailable(deviceType);
+    },
+    /**
+     * Returns currently used audio output device id, '' stands for default
+     * device
+     * @returns {string}
+     */
+    getAudioOutputDevice: function () {
+        return RTC.getAudioOutputDevice();
+    },
+    /**
+     * Sets current audio output device.
+     * @param {string} deviceId - id of 'audiooutput' device from
+     *      navigator.mediaDevices.enumerateDevices(), '' is for default device
+     * @returns {Promise} - resolves when audio output is changed, is rejected
+     *      otherwise
+     */
+    setAudioOutputDevice: function (deviceId) {
+        return RTC.setAudioOutputDevice(deviceId);
     },
     enumerateDevices: function (callback) {
         RTC.enumerateDevices(callback);
@@ -168,11 +198,12 @@ var LibJitsiMeet = {
             'Line: ' + lineno,
             'Column: ' + colno,
             'StackTrace: ', error);
-
-        JitsiMeetJS._globalOnErrorHandler.forEach(function (handler) {
-            handler(error);
-        });
-        if(!JitsiMeetJS._globalOnErrorHandler.length){
+        var globalOnErrorHandler = this._globalOnErrorHandler;
+        if (globalOnErrorHandler.length) {
+          globalOnErrorHandler.forEach(function (handler) {
+              handler(error);
+          });
+        } else {
             Statistics.sendUnhandledError(error);
         }
     },
@@ -186,6 +217,15 @@ var LibJitsiMeet = {
         RTCUIHelper: RTCUIHelper
     }
 };
+
+// XXX JitsiConnection or the instances it initializes and is associated with
+// (e.g. JitsiConference) may need a reference to LibJitsiMeet (aka
+// JitsiMeetJS). An approach could be to declare LibJitsiMeet global (which is
+// what we do in Jitsi Meet) but that could be seen as not such a cool decision
+// certainly looks even worse within the lib-jitsi-meet library itself. That's
+// why the decision is to provide LibJitsiMeet as a parameter of
+// JitsiConnection.
+LibJitsiMeet.JitsiConnection = JitsiConnection.bind(null, LibJitsiMeet);
 
 //Setups the promise object.
 window.Promise = window.Promise || require("es6-promise").Promise;
