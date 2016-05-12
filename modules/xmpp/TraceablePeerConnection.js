@@ -38,6 +38,12 @@ function TraceablePeerConnection(ice_config, constraints, session) {
         explodeRemoteSimulcast: false});
     this.eventEmitter = this.session.room.eventEmitter;
 
+	if(RTCBrowserType.isiOSRTC())
+	{
+		this.waitingRemoteDescriptionToBeSet = false;
+		this.waitingLocalDescriptionToBeSet = false;
+	}
+	
     // override as desired
     this.trace = function (what, info) {
         /*logger.warn('WTRACE', what, info);
@@ -54,6 +60,7 @@ function TraceablePeerConnection(ice_config, constraints, session) {
             type: what,
             value: info || ""
         });
+		console.log(what /*+ ":" + info*/);
     };
     this.onicecandidate = null;
     this.peerconnection.onicecandidate = function (event) {
@@ -529,9 +536,17 @@ TraceablePeerConnection.prototype.setLocalDescription
     }
 
     var self = this;
-    this.peerconnection.setLocalDescription(description,
+	if(RTCBrowserType.isiOSRTC())
+	{
+		this.waitingLocalDescriptionToBeSet = true;
+    }
+	this.peerconnection.setLocalDescription(description,
         function () {
             self.trace('setLocalDescriptionOnSuccess');
+			if(RTCBrowserType.isiOSRTC())
+			{
+				self.waitingLocalDescriptionToBeSet = false;
+			}
             successCallback();
         },
         function (err) {
@@ -561,9 +576,18 @@ TraceablePeerConnection.prototype.setRemoteDescription
     }
 
     var self = this;
+	
+	if(RTCBrowserType.isiOSRTC())
+	{
+		this.waitingRemoteDescriptionToBeSet = true;
+    }
     this.peerconnection.setRemoteDescription(description,
         function () {
             self.trace('setRemoteDescriptionOnSuccess');
+			if(RTCBrowserType.isiOSRTC())
+			{
+				self.waitingRemoteDescriptionToBeSet = false;
+			}
             successCallback();
         },
         function (err) {
@@ -610,7 +634,7 @@ TraceablePeerConnection.prototype.createAnswer
                     dumpSDP(answer));
             }
 
-            if (!RTCBrowserType.isFirefox())
+            if (!RTCBrowserType.isFirefox() && !RTCBrowserType.isiOSRTC())
             {
                 answer = self.ssrcReplacement(answer);
                 self.trace('createAnswerOnSuccess::mungeLocalVideoSSRC',

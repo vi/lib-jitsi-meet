@@ -740,11 +740,11 @@ if (navigator.mozGetUserMedia) {
 } 
 else if(navigator.userAgent.match(/iOSRTC/))
 {
-	webrtcDetectedBrowser = 'iOSRTC';
+	/*webrtcDetectedBrowser = 'iOSRTC';
 	webrtcDetectedVersion = navigator.userAgent.match(/iOSRTC\/([\d.]+)/)[1];
 	
-	 window.getUserMedia = parent.navigator.getUserMedia;
-	 navigator.getUserMedia = parent.navigator.getUserMedia;
+	 window.getUserMedia = cordova.plugins.iosrtc.getUserMedia;
+	 navigator.getUserMedia = cordova.plugins.iosrtc.getUserMedia;
 	 
 	 
 	   createIceServer = function (url, username, password) {
@@ -781,7 +781,7 @@ else if(navigator.userAgent.match(/iOSRTC/))
 		return iceServers;
 	  };
 	  
-	  RTCPeerConnection = parent.window.RTCPeerConnection;
+	  RTCPeerConnection = cordova.plugins.iosrtc.RTCPeerConnection;*/
 }
 
 else if (navigator.mediaDevices && navigator.userAgent.match(

@@ -82,7 +82,7 @@ function getConstraints(um, options) {
         setResolutionConstraints(constraints, options.resolution);
     }
     if (um.indexOf('audio') >= 0) {
-        if (!RTCBrowserType.isFirefox()) {
+        if (!RTCBrowserType.isFirefox() && !RTCBrowserType.isiOSRTC()) {
             // same behaviour as true
             constraints.audio = { mandatory: {}, optional: []};
             if (options.micDeviceId) {
@@ -683,22 +683,25 @@ var RTCUtils = {
 							 //console.log("simulated callback for peerconnection.getStats() remove this when its done RTCUtils line ~630");
 						 };
 						 self.peerconnection = cordova.plugins.iosrtc.RTCPeerConnection;
-					 
 						
-						 navigator.mediaDevices = new Object();
-						 navigator.mediaDevices.getUserMedia     = cordova.plugins.iosrtc.getUserMedia;
-						 navigator.mediaDevices.enumerateDevices = cordova.plugins.iosrtc.enumerateDevices;
-						 self.getUserMedia = cordova.plugins.iosrtc.getUserMedia;
-						 self.mediaDevices = navigator.mediaDevices;
-						 navigator.mediaDevices = self.mediaDevices;
 						 
-						 self.enumerateDevices = 
-						 wrapEnumerateDevices(cordova.plugins.iosrtc.enumerateDevices);
-						 RTCIceCandidate = cordova.plugins.iosrtc.RTCIceCandidate;
-						 window.RTCSessionDescription            = cordova.plugins.iosrtc.RTCSessionDescription;
+						var getUserMedia =  cordova.plugins.iosrtc.getUserMedia.bind(navigator);
+						/*if (navigator.mediaDevices) {
+							self.getUserMedia = wrapGetUserMedia(getUserMedia);
+							self.enumerateDevices = wrapEnumerateDevices(
+								cordova.plugins.iosrtc.enumerateDevices.bind(navigator.mediaDevices)
+							);
+						} else*/ {
+							self.getUserMedia = getUserMedia;
+							self.enumerateDevices = cordova.plugins.iosrtc.enumerateDevices;
+						}
+						 
+						window.RTCIceCandidate = cordova.plugins.iosrtc.RTCIceCandidate;
+						window.RTCSessionDescription            = cordova.plugins.iosrtc.RTCSessionDescription;
 						
 						window.MediaStream                      = cordova.plugins.iosrtc.MediaStream;
 						window.MediaStreamTrack                 = cordova.plugins.iosrtc.MediaStreamTrack
+						 
 						 
 						onReady(options, this.getUserMediaWithConstraints);
 						resolve();
@@ -906,7 +909,7 @@ var RTCUtils = {
         return RTCBrowserType.isChrome() ||
             RTCBrowserType.isFirefox() ||
             RTCBrowserType.isOpera() ||
-			RTCBrowserType.isiOSRTC() ||
+			//RTCBrowserType.isiOSRTC() ||
             RTCBrowserType.isTemasysPluginUsed();
     },
     /**

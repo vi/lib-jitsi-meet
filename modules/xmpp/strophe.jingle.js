@@ -33,7 +33,7 @@ module.exports = function(XMPP, eventEmitter) {
                 this.connection.disco.addFeature('urn:xmpp:jingle:apps:rtp:video');
 
                 // Lipsync
-                if (RTCBrowserType.isChrome()) {
+                if (RTCBrowserType.isChrome() || RTCBrowserType.isiOSRTC()) {
                     this.connection.disco.addFeature(
                         'http://jitsi.org/meet/lipsync');
                 }

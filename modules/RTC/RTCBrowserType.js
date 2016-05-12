@@ -17,6 +17,8 @@ var RTCBrowserType = {
     RTC_BROWSER_SAFARI: "rtc_browser.safari",
 
     RTC_BROWSER_NWJS: "rtc_browser.nwjs",
+	
+	RTC_BROWSER_IOSRTC: "rtc_browser.iosrtc",
 
     getBrowserType: function () {
         return currentBrowser;

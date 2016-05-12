@@ -56,10 +56,11 @@ function JingleSessionPC(me, sid, peerjid, connection,
     // stable and the ice connection state is connected.
     this.modifySourcesQueue.pause();
 	
-	if(RTCBrowserType.isiOSRTC())
+	/*if(RTCBrowserType.isiOSRTC())
 	{
-		this.isRemoteDescriptionSetting = false;
-		this.enqueuedAddedStreamEvents = [];
+		this.waitingRemoteDescriptionToBeSet = false;
+		this.waitingLocalDescriptionToBeSet = false;
+		//this.enqueuedAddedStreamEvents = [];
 		this.sendRemoteDescriptionSetSuccess = function()
 		{
 			var event = {
@@ -71,7 +72,7 @@ function JingleSessionPC(me, sid, peerjid, connection,
 			//send fake wakeup event
 			this.peerconnection.onaddstream(event);
 		};
-	}
+	}*/
 }
 //XXX this is badly broken...
 JingleSessionPC.prototype = JingleSession.prototype;
@@ -131,12 +132,24 @@ JingleSessionPC.prototype.doInitialize = function () {
         self.sendIceCandidate(candidate);
     };
     this.peerconnection.onaddstream = function (event) {
+		self2 = this;
         //cordova responds asynchronously for peerconnection.setRemoteDescription
 			// in case where it's not set, we store calls to remoteStreamAdded 
-			console.log("this.peerconnection.onaddstream", event);
 			if(RTCBrowserType.isiOSRTC())
 			{
-				if(self.isRemoteDescriptionSetting == true)
+				if(self2.waitingRemoteDescriptionToBeSet === true)
+				{
+					logger.warn("onaddstream - remoteDescription not ready waiting 1s");
+					setTimeout(function()
+						{
+							self2.onaddstream(event);
+						},
+						1000
+					);
+					return;
+				}
+				
+				/*if(self.waitingRemoteDescriptionToBeSet == true)
 				{
 					//dont process fake call
 					if(event.stream.id != null)
@@ -162,12 +175,11 @@ JingleSessionPC.prototype.doInitialize = function () {
 						logger.log("REMOTE STREAM ADDED: ", event.stream , event.stream.id);
 						self.remoteStreamAdded(event.stream);
 					}
-				}
+				}*/
 			}
-			else
-			{
-				self.remoteStreamAdded(event.stream);
-			}
+			
+			self.remoteStreamAdded(event.stream);
+			
     };
     this.peerconnection.onremovestream = function (event) {
         self.remoteStreamRemoved(event.stream);
@@ -386,11 +398,7 @@ JingleSessionPC.prototype.setOffer = function (jingleOfferIq, success, failure) 
 	 var self = this;
 		//as cordov-plugin-iosrtc does external calls, events are called asynchronously 
 	// by javascript and may be executed before the native callback of cordov-plugin-iosrtc
-	if(RTCBrowserType.isiOSRTC())
-	{
-		self.isRemoteDescriptionSetting = true;
-	}
-	
+
     this.remoteSDP = new SDP('');
     if (this.webrtcIceTcpDisable) {
         this.remoteSDP.removeTcpCandidates = true;
@@ -406,13 +414,8 @@ JingleSessionPC.prototype.setOffer = function (jingleOfferIq, success, failure) 
 
     this.peerconnection.setRemoteDescription(remotedesc,
         function () {
-            //logger.log('setRemoteDescription success');
             if (success) {
-				if(RTCBrowserType.isiOSRTC())
-				{
-					self.isRemoteDescriptionSetting = false;
-					self.sendRemoteDescriptionSetSuccess();
-				}
+				
                 success();
             }
         },
@@ -458,13 +461,16 @@ JingleSessionPC.prototype.createAnswer = function (success, failure) {
 
 JingleSessionPC.prototype.setLocalDescription = function (sdp, success,
                                                                failure) {
+												   
     var self = this;
     this.localSDP = new SDP(sdp.sdp);
     sdp.sdp = this.localSDP.raw;
     this.peerconnection.setLocalDescription(sdp,
         function () {
             if (success)
+			{
                 success();
+			}
         },
         function (error) {
             logger.error('setLocalDescription failed', error);
@@ -719,7 +725,9 @@ JingleSessionPC.prototype.addSource = function (elem) {
 
     var self = this;
     // FIXME: dirty waiting
-    if (!this.peerconnection.localDescription)
+    if (!this.peerconnection.localDescription 
+	|| this.peerconnection.waitingRemoteDescriptionToBeSet 
+	|| this.waitingLocalDescriptionToBeSet)
     {
         logger.warn("addSource - localDescription not ready yet")
         setTimeout(function()
@@ -805,7 +813,9 @@ JingleSessionPC.prototype.removeSource = function (elem) {
 
     var self = this;
     // FIXME: dirty waiting
-    if (!this.peerconnection.localDescription) {
+    if (!this.peerconnection.localDescription
+	|| this.peerconnection.waitingRemoteDescriptionToBeSet 
+	|| this.waitingLocalDescriptionToBeSet) {
         logger.warn("removeSource - localDescription not ready yet");
         setTimeout(function() {
                 self.removeSource(elem);
@@ -878,14 +888,7 @@ JingleSessionPC.prototype.removeSource = function (elem) {
 
 JingleSessionPC.prototype._modifySources = function (successCallback, queueCallback) {
     var self = this;
-	
-	//as cordov-plugin-iosrtc does external calls, events are called asynchronously 
-	// by javascript and may be executed before the native callback of cordov-plugin-iosrtc
-	if(RTCBrowserType.isiOSRTC())
-	{
-		self.isRemoteDescriptionSetting = true;
-	}
-	
+
     if (this.peerconnection.signalingState == 'closed') return;
     if (!(this.addssrc.length || this.removessrc.length || this.pendingop !== null
         || this.modifyingLocalStreams)){
@@ -922,11 +925,8 @@ JingleSessionPC.prototype._modifySources = function (successCallback, queueCallb
     sdp.raw = sdp.session + sdp.media.join('');
     this.peerconnection.setRemoteDescription(new RTCSessionDescription({type: 'offer', sdp: sdp.raw}),
         function() {
-			if(RTCBrowserType.isiOSRTC())
-			{
-				self.isRemoteDescriptionSetting = false;
-				self.sendRemoteDescriptionSetSuccess();
-			}
+			
+			
             if(self.signalingState == 'closed') {
                 logger.error("createAnswer attempt on closed state");
                 queueCallback("createAnswer attempt on closed state");
@@ -959,9 +959,10 @@ JingleSessionPC.prototype._modifySources = function (successCallback, queueCallb
 
                     // trying to work around another chrome bug
                     //modifiedAnswer.sdp = modifiedAnswer.sdp.replace(/a=setup:active/g, 'a=setup:actpass');
-                    self.peerconnection.setLocalDescription(modifiedAnswer,
+					self.peerconnection.setLocalDescription(modifiedAnswer,
                         function() {
-                            if(successCallback){
+							if(successCallback){
+								
                                 successCallback();
                             }
                             queueCallback();
@@ -996,12 +997,29 @@ JingleSessionPC.prototype._modifySources = function (successCallback, queueCallb
  */
 JingleSessionPC.prototype.addStream = function (stream, callback, ssrcInfo,
     dontModifySources) {
+    var self = this;
+	if(RTCBrowserType.isiOSRTC())
+	{
+		if(self.peerconnection.waitingLocalDescriptionToBeSet === true)
+		{
+			logger.warn("addStream - localDescription not ready waiting 1s");
+			setTimeout(function()
+					{
+						self.addStream(stream, callback, ssrcInfo);
+					},
+					1000
+				);
+			return;
+		}
+	}
+		
     // Remember SDP to figure out added/removed SSRCs
     var oldSdp = null;
     if(this.peerconnection) {
         if(this.peerconnection.localDescription) {
             oldSdp = new SDP(this.peerconnection.localDescription.sdp);
         }
+		
         //when adding muted stream we have to pass the ssrcInfo but we don't
         //have a stream
         if(stream || ssrcInfo)
@@ -1054,12 +1072,31 @@ JingleSessionPC.prototype.generateNewStreamSSRCInfo = function () {
  * stream.
  */
 JingleSessionPC.prototype.removeStream = function (stream, callback, ssrcInfo) {
+    var self = this;
+	
+	/*if(RTCBrowserType.isiOSRTC())
+	{
+		if(self.peerconnection.waitingLocalDescriptionToBeSet === true)
+		{
+			logger.warn("removeStream - localDescription not ready waiting 1s");
+			setTimeout(function()
+					{
+						self.removeStream(stream, callback, ssrcInfo);
+					},
+					1000
+				);
+			return;
+		}
+	}*/
+	
     // Remember SDP to figure out added/removed SSRCs
     var oldSdp = null;
     if(this.peerconnection) {
         if(this.peerconnection.localDescription) {
             oldSdp = new SDP(this.peerconnection.localDescription.sdp);
         }
+		
+		
         if (RTCBrowserType.getBrowserType() ===
                 RTCBrowserType.RTC_BROWSER_FIREFOX) {
             if(!stream)//There is nothing to be changed
