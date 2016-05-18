@@ -303,7 +303,9 @@ RTC.getVideoSrc = function (element) {
  * false if not.
  */
 RTC.isDeviceListAvailable = function () {
-    return RTCUtils.isDeviceListAvailable();
+	var r = RTCUtils.isDeviceListAvailable();
+	console.log("isDeviceListAvailable = ", r);
+    return r;
 };
 
 /**
@@ -314,7 +316,10 @@ RTC.isDeviceListAvailable = function () {
  * @returns {boolean} true if available, false otherwise.
  */
 RTC.isDeviceChangeAvailable = function (deviceType) {
-    return RTCUtils.isDeviceChangeAvailable(deviceType);
+    r = RTCUtils.isDeviceChangeAvailable(deviceType);
+	
+	console.log("isDeviceChangeAvailable = ", r);
+	return r;
 };
 
 /**

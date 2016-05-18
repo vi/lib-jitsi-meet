@@ -68,6 +68,7 @@ function setResolutionConstraints(constraints, resolution) {
  * @param {bool} firefox_fake_device
  */
 function getConstraints(um, options) {
+
     var constraints = {audio: false, video: false};
 
     if (um.indexOf('video') >= 0) {
@@ -395,7 +396,7 @@ function handleLocalStream(streams, resolution) {
     var audioStream, videoStream, desktopStream, res = [];
     // If this is FF, the stream parameter is *not* a MediaStream object, it's
     // an object with two properties: audioStream, videoStream.
-    if (window.webkitMediaStream && !RTCBrowserType.isiOSRTC()) {
+    if (window.webkitMediaStream) {
         var audioVideo = streams.audioVideo;
         if (audioVideo) {
             var audioTracks = audioVideo.getAudioTracks();
@@ -431,17 +432,16 @@ function handleLocalStream(streams, resolution) {
 	
 	else if(RTCBrowserType.isiOSRTC())
 	{
-		 if (streams && streams.audio)
+		//TODO avoid calling getAudioTracks getVideoTracks twice
+		console.log("HandleLocalStream iOSRTC", streams, resolution);
+		if (streams && streams.audioVideo)
 		{
-            audioStream = streams.audio;
+			if(streams.audioVideo.getAudioTracks().length > 0)
+            audioStream = streams.audioVideo;
+		
+			if(streams.audioVideo.getVideoTracks().length > 0)
+            videoStream = streams.audioVideo;
 		}
-
-        if (streams && streams.video){
-            videoStream = streams.video;
-		}
-
-        if(streams && streams.desktop)
-            desktopStream = streams.desktop;
 	}
 
     if (desktopStream)
@@ -670,7 +670,7 @@ var RTCUtils = {
                             attachMediaStream(element, stream);
                         }
                     };
-
+			
                     onReady(options, self.getUserMediaWithConstraints);
                     resolve();
                 });
@@ -679,25 +679,24 @@ var RTCUtils = {
 			{
 					
 				 var self = this;
-				 self.attachMediaStream = function (element, stream) {
-                    // saves the created url for the stream, so we can reuse it
-                    // and not keep creating urls
-                    if (!element)
-                        return;
+				
+				this.attachMediaStream = function (element, stream) {
 					
-					//parent.cordova.plugins.iosrtc.observeVideo(element);
-					// Attach the MediaStream to it.
-					element.src = URL.createObjectURL(stream);
-                    
+					console.log("attachMediaStream", element, stream);
+
+					 if (!element)
+                        return;
+
+                    element.src = URL.createObjectURL(stream);
+
                     return element;
                 };
-              
-				self.getVideoSrc = function (element) {
+				this.getVideoSrc = function (element) {
                     if (!element)
                         return null;
                     return element.getAttribute("src");
                 };
-                self.setVideoSrc = function (element, src) {
+                this.setVideoSrc = function (element, src) {
                     if (!src) {
                         src = '';
                     }
@@ -722,7 +721,7 @@ var RTCUtils = {
 						 self.peerconnection = cordova.plugins.iosrtc.RTCPeerConnection;
 						
 						 
-						var getUserMedia =  cordova.plugins.iosrtc.getUserMedia.bind(navigator);
+						var getUserMedia =  cordova.plugins.iosrtc.getUserMedia;
 						/*if (navigator.mediaDevices) {
 							self.getUserMedia = wrapGetUserMedia(getUserMedia);
 							self.enumerateDevices = wrapEnumerateDevices(
@@ -739,7 +738,16 @@ var RTCUtils = {
 						window.MediaStream                      = cordova.plugins.iosrtc.MediaStream;
 						window.MediaStreamTrack                 = cordova.plugins.iosrtc.MediaStreamTrack
 						 
-						 
+						 /*if (!MediaStream.prototype.getVideoTracks) {
+								MediaStream.prototype.getVideoTracks = function () {
+									return this.videoTracks;
+								};
+							}
+							if (!MediaStream.prototype.getAudioTracks) {
+								MediaStream.prototype.getAudioTracks = function () {
+									return this.audioTracks;
+								};
+							}*/
 						onReady(options, this.getUserMediaWithConstraints);
 						resolve();
 					 });  // End of ondeviceready.
@@ -830,7 +838,7 @@ var RTCUtils = {
                 reject(new Error("Desktop sharing is not supported!"));
             }
             if (RTCBrowserType.isFirefox() ||
-                RTCBrowserType.isTemasysPluginUsed() || RTCBrowserType.isiOSRTC()) {
+                RTCBrowserType.isTemasysPluginUsed()) {
                 var GUM = function (device, s, e) {
                     this.getUserMediaWithConstraints(device, s, e, options);
                 };
@@ -947,13 +955,16 @@ var RTCUtils = {
      */
 
     isDeviceChangeAvailable: function (deviceType) {
+		
         return deviceType === 'output' || deviceType === 'audiooutput'
             ? isAudioOutputDeviceChangeAvailable
             : RTCBrowserType.isChrome() ||
                 RTCBrowserType.isFirefox() ||
                 RTCBrowserType.isOpera() ||
                 RTCBrowserType.isTemasysPluginUsed()||
-                RTCBrowserType.isNWJS();
+                RTCBrowserType.isNWJS() ||
+				RTCBrowserType.isiOSRTC()
+                ;
     },
     /**
      * A method to handle stopping of the stream.

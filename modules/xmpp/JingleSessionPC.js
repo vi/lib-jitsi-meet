@@ -55,24 +55,6 @@ function JingleSessionPC(me, sid, peerjid, connection,
     // We start with the queue paused. We resume it when the signaling state is
     // stable and the ice connection state is connected.
     this.modifySourcesQueue.pause();
-	
-	/*if(RTCBrowserType.isiOSRTC())
-	{
-		this.waitingRemoteDescriptionToBeSet = false;
-		this.waitingLocalDescriptionToBeSet = false;
-		//this.enqueuedAddedStreamEvents = [];
-		this.sendRemoteDescriptionSetSuccess = function()
-		{
-			var event = {
-							stream: {
-										id:null
-									}
-						};
-			
-			//send fake wakeup event
-			this.peerconnection.onaddstream(event);
-		};
-	}*/
 }
 //XXX this is badly broken...
 JingleSessionPC.prototype = JingleSession.prototype;
@@ -132,54 +114,26 @@ JingleSessionPC.prototype.doInitialize = function () {
         self.sendIceCandidate(candidate);
     };
     this.peerconnection.onaddstream = function (event) {
-		self2 = this;
-        //cordova responds asynchronously for peerconnection.setRemoteDescription
-			// in case where it's not set, we store calls to remoteStreamAdded 
-			if(RTCBrowserType.isiOSRTC())
-			{
-				if(self2.waitingRemoteDescriptionToBeSet === true)
+		if(RTCBrowserType.isiOSRTC() && cordova.plugins.iosrtc.cordovaNativeCalled === true)
+		{
+			self2 = this;
+			setTimeout(
+				function()
 				{
-					logger.warn("onaddstream - remoteDescription not ready waiting 1s");
-					setTimeout(function()
-						{
-							self2.onaddstream(event);
-						},
-						1000
-					);
-					return;
-				}
-				
-				/*if(self.waitingRemoteDescriptionToBeSet == true)
-				{
-					//dont process fake call
-					if(event.stream.id != null)
-					{
-						console.log("enqueued", event);
-						self.enqueuedAddedStreamEvents.push(event);
-					}
-				}
-				else
-				{
-					//if remoteDescription is ready
-					//handle existing events before current event
-					var i = null;
-					while(self.enqueuedAddedStreamEvents.length > 0)
-					{
-						i = self.enqueuedAddedStreamEvents.shift();
-						logger.log("REMOTE STREAM ADDED: ", i.stream , i.stream.id);
-						self.remoteStreamAdded(i.stream);
-					}
-					//dont process fake call
-					if(event.stream.id != null)
-					{
-						logger.log("REMOTE STREAM ADDED: ", event.stream , event.stream.id);
-						self.remoteStreamAdded(event.stream);
-					}
-				}*/
-			}
-			
-			self.remoteStreamAdded(event.stream);
-			
+					self2.peerconnection.onaddstream(event);
+				},
+				200
+			);
+			return;
+		}
+		
+		if(RTCBrowserType.isiOSRTC())
+		cordova.plugins.iosrtc.cordovaNativeCalled = true;
+	
+        self.remoteStreamAdded(event.stream);
+		
+		if(RTCBrowserType.isiOSRTC())
+		cordova.plugins.iosrtc.cordovaNativeCalled = false
     };
     this.peerconnection.onremovestream = function (event) {
         self.remoteStreamRemoved(event.stream);
@@ -396,10 +350,6 @@ JingleSessionPC.prototype.setOfferCycle = function (jingleOfferIq,
  *        setRemoteDescription fails.
  */
 JingleSessionPC.prototype.setOffer = function (jingleOfferIq, success, failure) {
-	 var self = this;
-		//as cordov-plugin-iosrtc does external calls, events are called asynchronously 
-	// by javascript and may be executed before the native callback of cordov-plugin-iosrtc
-
     this.remoteSDP = new SDP('');
     if (this.webrtcIceTcpDisable) {
         this.remoteSDP.removeTcpCandidates = true;
@@ -407,7 +357,7 @@ JingleSessionPC.prototype.setOffer = function (jingleOfferIq, success, failure) 
     if (this.webrtcIceUdpDisable) {
         this.remoteSDP.removeUdpCandidates = true;
     }
-	
+
     this.remoteSDP.fromJingle(jingleOfferIq);
     this.readSsrcInfo($(jingleOfferIq).find(">content"));
     var remotedesc
@@ -415,8 +365,8 @@ JingleSessionPC.prototype.setOffer = function (jingleOfferIq, success, failure) 
 
     this.peerconnection.setRemoteDescription(remotedesc,
         function () {
+            //logger.log('setRemoteDescription success');
             if (success) {
-				
                 success();
             }
         },
@@ -462,16 +412,13 @@ JingleSessionPC.prototype.createAnswer = function (success, failure) {
 
 JingleSessionPC.prototype.setLocalDescription = function (sdp, success,
                                                                failure) {
-												   
     var self = this;
     this.localSDP = new SDP(sdp.sdp);
     sdp.sdp = this.localSDP.raw;
     this.peerconnection.setLocalDescription(sdp,
         function () {
             if (success)
-			{
                 success();
-			}
         },
         function (error) {
             logger.error('setLocalDescription failed', error);
@@ -725,10 +672,21 @@ JingleSessionPC.prototype.onTerminated = function (reasonCondition,
 JingleSessionPC.prototype.addSource = function (elem) {
 
     var self = this;
+	
+	if(RTCBrowserType.isiOSRTC() && cordova.plugins.iosrtc.cordovaNativeCalled === true)
+	{
+		setTimeout(
+			function()
+			{
+				self.addSource(elem);
+			},
+			200
+		);
+		return;
+	}
+	
     // FIXME: dirty waiting
-    if (!this.peerconnection.localDescription 
-	|| this.peerconnection.waitingRemoteDescriptionToBeSet 
-	|| this.waitingLocalDescriptionToBeSet)
+    if (!this.peerconnection.localDescription)
     {
         logger.warn("addSource - localDescription not ready yet")
         setTimeout(function()
@@ -814,9 +772,7 @@ JingleSessionPC.prototype.removeSource = function (elem) {
 
     var self = this;
     // FIXME: dirty waiting
-    if (!this.peerconnection.localDescription
-	|| this.peerconnection.waitingRemoteDescriptionToBeSet 
-	|| this.waitingLocalDescriptionToBeSet) {
+    if (!this.peerconnection.localDescription) {
         logger.warn("removeSource - localDescription not ready yet");
         setTimeout(function() {
                 self.removeSource(elem);
@@ -926,14 +882,13 @@ JingleSessionPC.prototype._modifySources = function (successCallback, queueCallb
     sdp.raw = sdp.session + sdp.media.join('');
     this.peerconnection.setRemoteDescription(new RTCSessionDescription({type: 'offer', sdp: sdp.raw}),
         function() {
-			
-			
+
             if(self.signalingState == 'closed') {
                 logger.error("createAnswer attempt on closed state");
                 queueCallback("createAnswer attempt on closed state");
                 return;
             }
-			
+
             self.peerconnection.createAnswer(
                 function(modifiedAnswer) {
                     // change video direction, see https://github.com/jitsi/jitmeet/issues/41
@@ -960,10 +915,9 @@ JingleSessionPC.prototype._modifySources = function (successCallback, queueCallb
 
                     // trying to work around another chrome bug
                     //modifiedAnswer.sdp = modifiedAnswer.sdp.replace(/a=setup:active/g, 'a=setup:actpass');
-					self.peerconnection.setLocalDescription(modifiedAnswer,
+                    self.peerconnection.setLocalDescription(modifiedAnswer,
                         function() {
-							if(successCallback){
-								
+                            if(successCallback){
                                 successCallback();
                             }
                             queueCallback();
@@ -999,25 +953,25 @@ JingleSessionPC.prototype._modifySources = function (successCallback, queueCallb
  */
 JingleSessionPC.prototype.addStream = function (stream, callback, ssrcInfo,
     dontModifySources) {
-    var self = this;
-	if(RTCBrowserType.isiOSRTC())
+	
+	var self = this;
+	if(RTCBrowserType.isiOSRTC() && cordova.plugins.iosrtc.cordovaNativeCalled === true)
 	{
-		if(self.peerconnection.waitingLocalDescriptionToBeSet === true)
-		{
-			logger.warn("addStream - localDescription not ready waiting 1s");
-			setTimeout(function()
-					{
-						self.addStream(stream, callback, ssrcInfo);
-					},
-					1000
-				);
-			return;
-		}
-	}
+		self2 = this;
+		setTimeout(
+			function()
+			{
+				self.addStream(stream, callback, ssrcInfo,
+    dontModifySources);
+			},
+			200
+		);
+		return;
+	}	
+		
 		
     // Remember SDP to figure out added/removed SSRCs
     var oldSdp = null;
-
     if(this.peerconnection && this.peerconnection.localDescription) {
         oldSdp = new SDP(this.peerconnection.localDescription.sdp);
     }
@@ -1084,7 +1038,20 @@ JingleSessionPC.prototype.generateNewStreamSSRCInfo = function () {
  * @throws error if modifySourcesQueue is paused.
  */
 JingleSessionPC.prototype.removeStream = function (stream, callback, ssrcInfo) {
-
+	
+	var self = this;
+	if(RTCBrowserType.isiOSRTC() && cordova.plugins.iosrtc.cordovaNativeCalled === true)
+	{
+		setTimeout(
+			function()
+			{
+				self.removeStream(stream, callback, ssrcInfo);
+			},
+			200
+		);
+		return;
+	}	
+	
     // Conference is not active
     if(!this.peerconnection) {
         callback();
@@ -1120,7 +1087,6 @@ JingleSessionPC.prototype.removeStream = function (stream, callback, ssrcInfo) {
         } else if(stream.getVideoTracks() && stream.getVideoTracks().length) {
             track = stream.getVideoTracks()[0];
         }
-
 
         if(!track) {
             logger.log("Cannot remove tracks: no tracks.");
@@ -1187,6 +1153,19 @@ JingleSessionPC.prototype.removeStream = function (stream, callback, ssrcInfo) {
  */
 JingleSessionPC.prototype.notifyMySSRCUpdate = function (old_sdp, new_sdp) {
 
+				
+	var self = this;
+	if(RTCBrowserType.isiOSRTC() && cordova.plugins.iosrtc.cordovaNativeCalled === true)
+	{
+		setTimeout(
+			function()
+			{
+				self.notifyMySSRCUpdate(old_sdp, new_sdp);
+			},
+			1000
+		);
+		return;
+	}
     if (!(this.peerconnection.signalingState == 'stable' &&
         this.peerconnection.iceConnectionState == 'connected')){
         logger.log("Too early to send updates");
@@ -1333,6 +1312,21 @@ JingleSessionPC.prototype.remoteStreamAdded = function (stream) {
  * @param track the WebRTC MediaStreamTrack added for remote participant
  */
 JingleSessionPC.prototype.remoteTrackAdded = function (stream, track) {
+	
+	if(RTCBrowserType.isiOSRTC() && cordova.plugins.iosrtc.cordovaNativeCalled === true)
+		{
+			self2 = this;
+			setTimeout(
+				function()
+				{
+					self2.remoteTrackAdded(stream, track);
+				},
+				200
+			);
+			return;
+		}
+				
+	
     logger.info("Remote track added", stream, track);
     var streamId = RTC.getStreamID(stream);
     var mediaType = track.kind;
@@ -1352,12 +1346,12 @@ JingleSessionPC.prototype.remoteTrackAdded = function (stream, track) {
         logger.error("MediaType undefined", track);
         return;
     }
-	
+
     var remoteSDP = new SDP(this.peerconnection.remoteDescription.sdp);
-		
     var medialines = remoteSDP.media.filter(function (mediaLines){
         return mediaLines.startsWith("m=" + mediaType);
     });
+
     if (!medialines.length) {
         logger.error("No media for type " + mediaType + " found in remote SDP");
         return;

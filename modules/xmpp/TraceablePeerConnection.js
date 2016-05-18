@@ -38,12 +38,6 @@ function TraceablePeerConnection(ice_config, constraints, session) {
         explodeRemoteSimulcast: false});
     this.eventEmitter = this.session.room.eventEmitter;
 
-	if(RTCBrowserType.isiOSRTC())
-	{
-		this.waitingRemoteDescriptionToBeSet = false;
-		this.waitingLocalDescriptionToBeSet = false;
-	}
-	
     // override as desired
     this.trace = function (what, info) {
         /*logger.warn('WTRACE', what, info);
@@ -60,7 +54,6 @@ function TraceablePeerConnection(ice_config, constraints, session) {
             type: what,
             value: info || ""
         });
-		console.log(what /*+ ":" + info*/);
     };
     this.onicecandidate = null;
     this.peerconnection.onicecandidate = function (event) {
@@ -536,17 +529,24 @@ TraceablePeerConnection.prototype.setLocalDescription
     }
 
     var self = this;
-	if(RTCBrowserType.isiOSRTC())
+	
+	if(RTCBrowserType.isiOSRTC() && cordova.plugins.iosrtc.cordovaNativeCalled === true)
 	{
-		this.waitingLocalDescriptionToBeSet = true;
-    }
-	this.peerconnection.setLocalDescription(description,
+		self2 = this;
+		setTimeout(
+			function()
+			{
+				self.setLocalDescription(description, successCallback, failureCallback);
+			},
+			200
+		);
+		return;
+	}
+
+	
+    this.peerconnection.setLocalDescription(description,
         function () {
             self.trace('setLocalDescriptionOnSuccess');
-			if(RTCBrowserType.isiOSRTC())
-			{
-				self.waitingLocalDescriptionToBeSet = false;
-			}
             successCallback();
         },
         function (err) {
@@ -577,17 +577,22 @@ TraceablePeerConnection.prototype.setRemoteDescription
 
     var self = this;
 	
-	if(RTCBrowserType.isiOSRTC())
+	if(RTCBrowserType.isiOSRTC() && cordova.plugins.iosrtc.cordovaNativeCalled === true)
 	{
-		this.waitingRemoteDescriptionToBeSet = true;
-    }
+		self2 = this;
+		setTimeout(
+			function()
+			{
+				self.setRemoteDescription(description, successCallback, failureCallback);
+			},
+			200
+		);
+		return;
+	}
+	
     this.peerconnection.setRemoteDescription(description,
         function () {
             self.trace('setRemoteDescriptionOnSuccess');
-			if(RTCBrowserType.isiOSRTC())
-			{
-				self.waitingRemoteDescriptionToBeSet = false;
-			}
             successCallback();
         },
         function (err) {
@@ -634,7 +639,7 @@ TraceablePeerConnection.prototype.createAnswer
                     dumpSDP(answer));
             }
 
-            if (!RTCBrowserType.isFirefox() && !RTCBrowserType.isiOSRTC())
+            if (!RTCBrowserType.isFirefox())
             {
                 answer = self.ssrcReplacement(answer);
                 self.trace('createAnswerOnSuccess::mungeLocalVideoSSRC',
