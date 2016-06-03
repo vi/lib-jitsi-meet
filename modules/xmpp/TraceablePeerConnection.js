@@ -529,21 +529,7 @@ TraceablePeerConnection.prototype.setLocalDescription
     }
 
     var self = this;
-	
-	if(RTCBrowserType.isiOSRTC() && cordova.plugins.iosrtc.cordovaNativeCalled === true)
-	{
-		self2 = this;
-		setTimeout(
-			function()
-			{
-				self.setLocalDescription(description, successCallback, failureCallback);
-			},
-			200
-		);
-		return;
-	}
-
-	
+		
     this.peerconnection.setLocalDescription(description,
         function () {
             self.trace('setLocalDescriptionOnSuccess');
@@ -577,18 +563,6 @@ TraceablePeerConnection.prototype.setRemoteDescription
 
     var self = this;
 	
-	if(RTCBrowserType.isiOSRTC() && cordova.plugins.iosrtc.cordovaNativeCalled === true)
-	{
-		self2 = this;
-		setTimeout(
-			function()
-			{
-				self.setRemoteDescription(description, successCallback, failureCallback);
-			},
-			200
-		);
-		return;
-	}
 	
     this.peerconnection.setRemoteDescription(description,
         function () {

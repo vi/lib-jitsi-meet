@@ -62,9 +62,13 @@ JingleSessionPC.prototype.constructor = JingleSessionPC;
 
 
 JingleSessionPC.prototype.updateModifySourcesQueue = function() {
+	
+	console.info(">>> updateModifySourcesQueue");
     var signalingState = this.peerconnection.signalingState;
     var iceConnectionState = this.peerconnection.iceConnectionState;
     if (signalingState === 'stable' && iceConnectionState === 'connected') {
+		
+        console.info(">>> resuming");
         this.modifySourcesQueue.resume();
     } else {
         this.modifySourcesQueue.pause();
@@ -114,32 +118,14 @@ JingleSessionPC.prototype.doInitialize = function () {
         self.sendIceCandidate(candidate);
     };
     this.peerconnection.onaddstream = function (event) {
-		if(RTCBrowserType.isiOSRTC() && cordova.plugins.iosrtc.cordovaNativeCalled === true)
-		{
-			self2 = this;
-			setTimeout(
-				function()
-				{
-					self2.peerconnection.onaddstream(event);
-				},
-				200
-			);
-			return;
-		}
-		
-		if(RTCBrowserType.isiOSRTC())
-		cordova.plugins.iosrtc.cordovaNativeCalled = true;
-	
         self.remoteStreamAdded(event.stream);
-		
-		if(RTCBrowserType.isiOSRTC())
-		cordova.plugins.iosrtc.cordovaNativeCalled = false
     };
     this.peerconnection.onremovestream = function (event) {
         self.remoteStreamRemoved(event.stream);
     };
     this.peerconnection.onsignalingstatechange = function (event) {
         if (!(self && self.peerconnection)) return;
+		console.info(">>> signalingstatechanged",self.peerconnection.signalingState);
         if (self.peerconnection.signalingState === 'stable') {
             self.wasstable = true;
         }
@@ -154,6 +140,7 @@ JingleSessionPC.prototype.doInitialize = function () {
      */
     this.peerconnection.oniceconnectionstatechange = function (event) {
         if (!(self && self.peerconnection)) return;
+		console.info(">>> oniceconnectionstatechanged",self.peerconnection.iceConnectionState);
         var now = window.performance.now();
         self.room.connectionTimes["ice.state." +
             self.peerconnection.iceConnectionState] = now;
@@ -672,19 +659,6 @@ JingleSessionPC.prototype.onTerminated = function (reasonCondition,
 JingleSessionPC.prototype.addSource = function (elem) {
 
     var self = this;
-	
-	if(RTCBrowserType.isiOSRTC() && cordova.plugins.iosrtc.cordovaNativeCalled === true)
-	{
-		setTimeout(
-			function()
-			{
-				self.addSource(elem);
-			},
-			200
-		);
-		return;
-	}
-	
     // FIXME: dirty waiting
     if (!this.peerconnection.localDescription)
     {
@@ -751,7 +725,7 @@ JingleSessionPC.prototype.addSource = function (elem) {
         });
         sdp.raw = sdp.session + sdp.media.join('');
     });
-
+	console.info("this.modifySourcesQueue.paused ", this.modifySourcesQueue.paused);
     this.modifySourcesQueue.push(function() {
         // When a source is added and if this is FF, a new channel is allocated
         // for receiving the added source. We need to diffuse the SSRC of this
@@ -831,6 +805,7 @@ JingleSessionPC.prototype.removeSource = function (elem) {
         sdp.raw = sdp.session + sdp.media.join('');
     });
 
+	console.info("this.modifySourcesQueue.paused ", this.modifySourcesQueue.paused);
     this.modifySourcesQueue.push(function() {
         // When a source is removed and if this is FF, the recvonly channel that
         // receives the remote stream is deactivated . We need to diffuse the
@@ -953,23 +928,6 @@ JingleSessionPC.prototype._modifySources = function (successCallback, queueCallb
  */
 JingleSessionPC.prototype.addStream = function (stream, callback, ssrcInfo,
     dontModifySources) {
-	
-	var self = this;
-	if(RTCBrowserType.isiOSRTC() && cordova.plugins.iosrtc.cordovaNativeCalled === true)
-	{
-		self2 = this;
-		setTimeout(
-			function()
-			{
-				self.addStream(stream, callback, ssrcInfo,
-    dontModifySources);
-			},
-			200
-		);
-		return;
-	}	
-		
-		
     // Remember SDP to figure out added/removed SSRCs
     var oldSdp = null;
     if(this.peerconnection && this.peerconnection.localDescription) {
@@ -1003,8 +961,9 @@ JingleSessionPC.prototype.addStream = function (stream, callback, ssrcInfo,
     if(stream || ssrcInfo)
         this.peerconnection.addStream(stream, ssrcInfo);
 
-    this.modifyingLocalStreams = true;
+    this.modifyingLocalStreams = false;
     var self = this;
+	console.info("this.modifySourcesQueue.paused ", this.modifySourcesQueue.paused);
     this.modifySourcesQueue.push(function() {
         logger.log('modify sources done');
         if(ssrcInfo) {
@@ -1038,20 +997,6 @@ JingleSessionPC.prototype.generateNewStreamSSRCInfo = function () {
  * @throws error if modifySourcesQueue is paused.
  */
 JingleSessionPC.prototype.removeStream = function (stream, callback, ssrcInfo) {
-	
-	var self = this;
-	if(RTCBrowserType.isiOSRTC() && cordova.plugins.iosrtc.cordovaNativeCalled === true)
-	{
-		setTimeout(
-			function()
-			{
-				self.removeStream(stream, callback, ssrcInfo);
-			},
-			200
-		);
-		return;
-	}	
-	
     // Conference is not active
     if(!this.peerconnection) {
         callback();
@@ -1128,8 +1073,10 @@ JingleSessionPC.prototype.removeStream = function (stream, callback, ssrcInfo) {
     // some transformation in order to send remove-source for the muted
     // streams. That's why we aren't calling return here.
 
-    this.modifyingLocalStreams = true;
+    this.modifyingLocalStreams = false;
     var self = this;
+	
+	console.info("this.modifySourcesQueue.paused ", this.modifySourcesQueue.paused);
     this.modifySourcesQueue.push(function() {
         logger.log('modify sources done');
 
@@ -1153,19 +1100,6 @@ JingleSessionPC.prototype.removeStream = function (stream, callback, ssrcInfo) {
  */
 JingleSessionPC.prototype.notifyMySSRCUpdate = function (old_sdp, new_sdp) {
 
-				
-	var self = this;
-	if(RTCBrowserType.isiOSRTC() && cordova.plugins.iosrtc.cordovaNativeCalled === true)
-	{
-		setTimeout(
-			function()
-			{
-				self.notifyMySSRCUpdate(old_sdp, new_sdp);
-			},
-			1000
-		);
-		return;
-	}
     if (!(this.peerconnection.signalingState == 'stable' &&
         this.peerconnection.iceConnectionState == 'connected')){
         logger.log("Too early to send updates");
@@ -1312,21 +1246,6 @@ JingleSessionPC.prototype.remoteStreamAdded = function (stream) {
  * @param track the WebRTC MediaStreamTrack added for remote participant
  */
 JingleSessionPC.prototype.remoteTrackAdded = function (stream, track) {
-	
-	if(RTCBrowserType.isiOSRTC() && cordova.plugins.iosrtc.cordovaNativeCalled === true)
-		{
-			self2 = this;
-			setTimeout(
-				function()
-				{
-					self2.remoteTrackAdded(stream, track);
-				},
-				200
-			);
-			return;
-		}
-				
-	
     logger.info("Remote track added", stream, track);
     var streamId = RTC.getStreamID(stream);
     var mediaType = track.kind;
@@ -1348,7 +1267,7 @@ JingleSessionPC.prototype.remoteTrackAdded = function (stream, track) {
     }
 
     var remoteSDP = new SDP(this.peerconnection.remoteDescription.sdp);
-    var medialines = remoteSDP.media.filter(function (mediaLines){
+    var medialines = remoteSDP.media.filter(function (mediaLines) {
         return mediaLines.startsWith("m=" + mediaType);
     });
 
@@ -1359,11 +1278,8 @@ JingleSessionPC.prototype.remoteTrackAdded = function (stream, track) {
 
     var ssrclines = SDPUtil.find_lines(medialines[0], 'a=ssrc:');
     ssrclines = ssrclines.filter(function (line) {
-        if (RTCBrowserType.isTemasysPluginUsed()) {
-            return ((line.indexOf('mslabel:' + streamId) !== -1));
-        } else {
-            return ((line.indexOf('msid:' + streamId) !== -1));
-        }
+        var msid = RTCBrowserType.isTemasysPluginUsed() ? 'mslabel' : 'msid';
+        return line.indexOf(msid + ':' + streamId) !== -1;
     });
 
     var thessrc;
