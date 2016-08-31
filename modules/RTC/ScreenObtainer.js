@@ -73,7 +73,8 @@ var ScreenObtainer = {
                             error, constraints, ["desktop"]));
                     });
             };
-        } else if (RTCBrowserType.isTemasysPluginUsed()) {
+        } 
+		else if (RTCBrowserType.isTemasysPluginUsed()) {
             if (!AdapterJS.WebRTCPlugin.plugin.HasScreensharingFeature) {
                 logger.info("Screensharing not supported by this plugin " +
                     "version");
@@ -110,6 +111,15 @@ var ScreenObtainer = {
                 obtainDesktopStream = this.obtainScreenOnFirefox;
             }
 
+        }
+        else if(RTCBrowserType.isSafari())
+        {
+            logger.info("Safari desktop sharing not yet adapted");
+        }
+
+        else if(RTCBrowserType.isiOSRTC())
+        {
+            logger.info("iOS desktop sharing not yet adapted");
         }
 
         if (!obtainDesktopStream) {

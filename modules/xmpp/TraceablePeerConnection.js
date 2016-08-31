@@ -22,6 +22,8 @@ function TraceablePeerConnection(ice_config, constraints, session) {
         RTCPeerConnectionType = mozRTCPeerConnection;
     } else if (RTCBrowserType.isTemasysPluginUsed()) {
         RTCPeerConnectionType = RTCPeerConnection;
+    } else if (RTCBrowserType.isiOSRTC()) {
+        RTCPeerConnectionType = cordova.plugins.iosrtc.RTCPeerConnection;
     } else {
         RTCPeerConnectionType = webkitRTCPeerConnection;
     }
@@ -518,6 +520,7 @@ TraceablePeerConnection.prototype.setLocalDescription
     }
 
     var self = this;
+		
     this.peerconnection.setLocalDescription(description,
         function () {
             self.trace('setLocalDescriptionOnSuccess');
@@ -550,6 +553,8 @@ TraceablePeerConnection.prototype.setRemoteDescription
     }
 
     var self = this;
+	
+	
     this.peerconnection.setRemoteDescription(description,
         function () {
             self.trace('setRemoteDescriptionOnSuccess');
